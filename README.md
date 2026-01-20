@@ -8,8 +8,61 @@ A web application to extract and download clips from YouTube videos.
 - Download clips in high quality (best available)
 - Modern, responsive UI
 - Real-time status updates
+- Dynamic cookie management for YouTube authentication
 
-## Deployment to Render
+## 🚀 Quick Start with Cloudflare Tunnel (Recommended)
+
+**Why Cloudflare Tunnel?**
+- ✅ Works perfectly with yt-dlp (runs on your local machine)
+- ✅ No deployment restrictions
+- ✅ Free tier available
+- ✅ Full control over environment
+- ✅ No port binding issues
+
+### Quick Setup (5 minutes)
+
+1. **Install cloudflared:**
+   ```powershell
+   winget install --id Cloudflare.cloudflared
+   ```
+   Or download from: https://github.com/cloudflare/cloudflared/releases
+
+2. **Start your server:**
+   ```powershell
+   npm start
+   ```
+
+3. **In a new terminal, create tunnel:**
+   ```powershell
+   cloudflared tunnel --url http://localhost:3001
+   ```
+
+4. **Copy the URL** (looks like `https://xxxxx.trycloudflare.com`)
+   - This URL works for 8 hours (free tier)
+   - Share this URL to access your app!
+
+### Or Use the Helper Script
+
+**Windows PowerShell:**
+```powershell
+.\start-tunnel.ps1
+```
+
+**Windows CMD:**
+```cmd
+start-tunnel.bat
+```
+
+The script will:
+- Check if cloudflared is installed (install if needed)
+- Start your server automatically
+- Create the tunnel and show you the URL
+
+### Permanent Setup (Custom Domain)
+
+See `CLOUDFLARE_TUNNEL_SETUP.md` for detailed instructions on setting up a permanent tunnel with your own domain.
+
+## Deployment to Render (Alternative)
 
 ### Prerequisites
 

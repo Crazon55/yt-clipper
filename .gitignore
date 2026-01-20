@@ -7,3 +7,5 @@ downloads/
 .DS_Store
 yt-dlp
 yt-dlp.exe
+.cloudflared/
+*.pem
