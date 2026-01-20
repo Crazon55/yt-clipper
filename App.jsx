@@ -62,8 +62,8 @@ export default function App() {
     return (
         <div className="min-h-screen w-full flex items-center justify-center p-6 bg-slate-950 text-slate-100 selection:bg-red-500/30 relative">
             {/* Cookie Manager Link */}
-            <a 
-                href="/cookies" 
+            <a
+                href="/cookies"
                 className="absolute top-4 right-4 text-xs text-slate-400 hover:text-slate-200 transition-colors underline"
                 title="Manage YouTube Cookies"
             >

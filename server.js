@@ -19,9 +19,10 @@ if (!fs.existsSync(DOWNLOAD_DIR)) {
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from React app in production
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'dist')));
+// Serve static files from React app (check if dist exists)
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
 }
 
 // Helper: Parse time string (HH:MM:SS or MM:SS or SS) to seconds
@@ -38,38 +39,41 @@ const parseTimeToSeconds = (timeStr) => {
     return null;
 };
 
-// Helper: Get yt-dlp command based on environment
-// Prioritize Python (most reliable), then system command, then binary
+// Helper: Get yt-dlp command - try system command first, then Python, then binary
 const getYtDlpCommand = () => {
-    // Try Python3 first (most reliable on Render)
+    const { execSync } = require('child_process');
+    
+    // Try system yt-dlp command first (most common)
     try {
-        const { execSync } = require('child_process');
-        execSync('python3 --version', { stdio: 'ignore', timeout: 1000 });
-        console.log('Using python3 -m yt_dlp (most reliable)');
-        return 'python3';
+        if (process.platform === 'win32') {
+            execSync('where yt-dlp', { stdio: 'ignore', timeout: 1000 });
+        } else {
+            execSync('which yt-dlp', { stdio: 'ignore', timeout: 1000 });
+        }
+        return 'yt-dlp';
+    } catch (err) {
+        // System command not found, try Python
+    }
+    
+    // Try Python module
+    try {
+        execSync('python -m yt_dlp --version', { stdio: 'ignore', timeout: 1500 });
+        return 'python';
     } catch (err) {
         try {
-            execSync('python --version', { stdio: 'ignore', timeout: 1000 });
-            console.log('Using python -m yt_dlp');
-            return 'python';
+            execSync('python3 -m yt_dlp --version', { stdio: 'ignore', timeout: 1500 });
+            return 'python3';
         } catch (err2) {
-            // Python not found, continue
+            // Python not available
         }
     }
     
-    // Try system yt-dlp command (if installed via package manager or pip)
-    if (process.platform !== 'win32') {
-        try {
-            const { execSync } = require('child_process');
-            execSync('which yt-dlp', { stdio: 'ignore', timeout: 1000 });
-            console.log('Using system yt-dlp command (found in PATH)');
-            return 'yt-dlp';
-        } catch (err) {
-            // System command not found
-        }
+    // Check for local binary
+    const ytDlpExe = path.join(__dirname, 'yt-dlp.exe');
+    if (fs.existsSync(ytDlpExe)) {
+        return ytDlpExe;
     }
     
-    // Check for standalone binary (for Render/Linux) - last resort
     const ytDlpPath = path.join(__dirname, 'yt-dlp');
     if (fs.existsSync(ytDlpPath)) {
         if (process.platform !== 'win32') {
@@ -79,19 +83,10 @@ const getYtDlpCommand = () => {
                 // Ignore chmod errors
             }
         }
-        console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         return ytDlpPath;
     }
     
-    // Check for standalone binary with .exe (Windows)
-    const ytDlpExe = path.join(__dirname, 'yt-dlp.exe');
-    if (fs.existsSync(ytDlpExe)) {
-        console.log(`Using yt-dlp.exe at: ${ytDlpExe}`);
-        return ytDlpExe;
-    }
-    
-    // Final fallback
-    console.log('No yt-dlp found, will fail');
+    // Fallback
     return 'yt-dlp';
 };
 
@@ -109,9 +104,6 @@ const runYtDlp = (args) => {
     return new Promise((resolve, reject) => {
         const command = getYtDlpCommand();
         const processArgs = getYtDlpArgs(args);
-        
-        // Log for debugging
-        console.log(`Running: ${command} ${processArgs.join(' ')}`);
         
         const childProcess = spawn(command, processArgs, {
             cwd: __dirname,
@@ -219,10 +211,9 @@ app.post('/api/clip', async (req, res) => {
         // Use minimal flags to avoid format-related errors
         const infoArgs = ['--dump-json', '--no-playlist', '--no-warnings', '--skip-download'];
         
-        // Add cookies if available
+        // Add cookies if available (silently, optional)
         if (fs.existsSync(COOKIES_FILE)) {
             infoArgs.push('--cookies', COOKIES_FILE);
-            console.log(`[${jobId}] Using cookies file for authentication`);
         }
         
         infoArgs.push(cleanUrl);
@@ -294,7 +285,7 @@ app.post('/api/clip', async (req, res) => {
             '--progress', // Show progress instead of quiet
         ];
         
-        // Add cookies if available
+        // Add cookies if available (silently, optional)
         if (fs.existsSync(COOKIES_FILE)) {
             downloadArgs.push('--cookies', COOKIES_FILE);
         }
@@ -386,10 +377,19 @@ app.get('/api/cookies-status', (req, res) => {
     }
 });
 
-// Serve React app for all non-API routes in production
-if (process.env.NODE_ENV === 'production') {
+// Serve React app for all non-API routes (if dist exists)
+if (fs.existsSync(distPath)) {
     app.get('*', (req, res) => {
         res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
+} else {
+    // Fallback if dist doesn't exist
+    app.get('/', (req, res) => {
+        res.json({ 
+            message: 'YouTube Clipper API', 
+            status: 'running',
+            note: 'Frontend not built. Run "npm run build" first.'
+        });
     });
 }
 
