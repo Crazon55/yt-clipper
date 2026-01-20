@@ -2,7 +2,7 @@ services:
   - type: web
     name: yt-clipper
     env: node
-    buildCommand: npm install && node scripts/install-ytdlp.js && npm run build
+    buildCommand: npm install --include=dev && node scripts/install-ytdlp.js && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
