@@ -38,28 +38,32 @@ const parseTimeToSeconds = (timeStr) => {
 };
 
 // Helper: Get yt-dlp command based on environment
+// Try system command first (most reliable), then binary, then Python
 const getYtDlpCommand = () => {
-    // Check for standalone binary first (for Render/Linux)
+    // First, try system yt-dlp command (if installed via package manager)
+    if (process.platform !== 'win32') {
+        try {
+            const { execSync } = require('child_process');
+            execSync('which yt-dlp', { stdio: 'ignore', timeout: 1000 });
+            console.log('Using system yt-dlp command (found in PATH)');
+            return 'yt-dlp';
+        } catch (err) {
+            // System command not found, continue to check binary
+        }
+    }
+    
+    // Check for standalone binary (for Render/Linux)
     const ytDlpPath = path.join(__dirname, 'yt-dlp');
     if (fs.existsSync(ytDlpPath)) {
         // Make sure it's executable on Unix systems
         if (process.platform !== 'win32') {
             try {
                 fs.chmodSync(ytDlpPath, '755');
-                // Test if binary works by checking version
-                try {
-                    const { execSync } = require('child_process');
-                    const version = execSync(`"${ytDlpPath}" --version`, { encoding: 'utf8', timeout: 5000 }).trim();
-                    console.log(`Using yt-dlp binary at: ${ytDlpPath} (version: ${version})`);
-                } catch (testErr) {
-                    console.log(`Using yt-dlp binary at: ${ytDlpPath} (version check failed, but binary exists)`);
-                }
             } catch (err) {
-                console.log(`Using yt-dlp binary at: ${ytDlpPath} (chmod failed, but may still work)`);
+                // Ignore chmod errors
             }
-        } else {
-            console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         }
+        console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         return ytDlpPath;
     }
     
@@ -68,12 +72,6 @@ const getYtDlpCommand = () => {
     if (fs.existsSync(ytDlpExe)) {
         console.log(`Using yt-dlp.exe at: ${ytDlpExe}`);
         return ytDlpExe;
-    }
-    
-    // Try system yt-dlp command
-    if (process.platform !== 'win32') {
-        console.log('Using system yt-dlp command');
-        return 'yt-dlp';
     }
     
     // Fallback to Python module (Windows/local dev)
