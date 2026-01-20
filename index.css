@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+    --color-brand-red: #ef4444;
+    --color-brand-orange: #f97316;
+}
+
+/* Safety fix for the overlapping icons */
+.input-with-icon {
+    padding-left: 3.5rem !important;
+}
+
+:root {
+    background-color: #020617;
+}
+
+body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+}
