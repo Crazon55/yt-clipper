@@ -75,14 +75,26 @@ const runYtDlp = (args) => {
         const command = getYtDlpCommand();
         const processArgs = getYtDlpArgs(args);
         
-        const process = spawn(command, processArgs);
+        // Log for debugging
+        console.log(`Running: ${command} ${processArgs.join(' ')}`);
+        
+        const process = spawn(command, processArgs, {
+            cwd: __dirname,
+            env: { ...process.env, PATH: process.env.PATH }
+        });
         let stdout = '';
         let stderr = '';
 
-        process.stdout.on('data', (data) => stdout += data.toString());
-        process.stderr.on('data', (data) => stderr += data.toString());
+        process.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+        
+        process.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
 
         process.on('error', (err) => {
+            console.error(`yt-dlp spawn error:`, err);
             if (err.code === 'ENOENT') {
                 reject(new Error('yt-dlp is not installed. Please install it with: pip install yt-dlp or download the binary'));
             } else {
@@ -91,16 +103,26 @@ const runYtDlp = (args) => {
         });
 
         process.on('close', (code) => {
+            console.log(`yt-dlp exit code: ${code}, stdout length: ${stdout.length}, stderr length: ${stderr.length}`);
+            
             if (code !== 0) {
                 // yt-dlp sometimes returns non-zero codes but still outputs JSON to stdout
                 // Check if we have valid output in stdout first
                 if (stdout.trim() && stdout.trim().startsWith('{')) {
                     resolve(stdout);
                 } else {
-                    reject(new Error(stderr || stdout || 'yt-dlp failed'));
+                    // Log stderr for debugging
+                    if (stderr) {
+                        console.error(`yt-dlp stderr: ${stderr.substring(0, 500)}`);
+                    }
+                    reject(new Error(stderr || stdout || `yt-dlp failed with exit code ${code}`));
                 }
             } else {
-                resolve(stdout);
+                if (!stdout.trim()) {
+                    reject(new Error(`yt-dlp returned empty output. stderr: ${stderr.substring(0, 200)}`));
+                } else {
+                    resolve(stdout);
+                }
             }
         });
     });
@@ -118,16 +140,26 @@ app.post('/api/clip', async (req, res) => {
 
         // 1. Fetch Metadata (Duration check)
         // We use --dump-json to get video info, --no-warnings to reduce noise
-        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', url];
-        const infoJson = await runYtDlp(infoArgs);
+        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate', url];
+        let infoJson;
+        try {
+            infoJson = await runYtDlp(infoArgs);
+        } catch (error) {
+            console.error(`[${jobId}] yt-dlp error:`, error.message);
+            throw new Error(`Failed to fetch video info: ${error.message}`);
+        }
         
         // Clean the JSON output (remove any leading/trailing whitespace or non-JSON content)
         const cleanedJson = infoJson.trim();
+        if (!cleanedJson) {
+            throw new Error('yt-dlp returned empty output. The video may be unavailable, private, or region-restricted.');
+        }
+        
         let videoInfo;
         try {
             videoInfo = JSON.parse(cleanedJson);
         } catch (parseError) {
-            console.error(`[${jobId}] JSON parse error. Raw output:`, cleanedJson.substring(0, 500));
+            console.error(`[${jobId}] JSON parse error. Raw output length: ${cleanedJson.length}, first 500 chars:`, cleanedJson.substring(0, 500));
             throw new Error(`Failed to parse video info. The video may be unavailable or private.`);
         }
 
