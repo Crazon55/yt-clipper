@@ -194,11 +194,22 @@ app.post('/api/clip', async (req, res) => {
         let cleanUrl = url;
         try {
             const urlObj = new URL(url);
-            // Extract video ID from v parameter
-            const videoId = urlObj.searchParams.get('v');
-            if (videoId) {
-                cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
-                console.log(`[${jobId}] Cleaned URL: ${cleanUrl}`);
+            
+            // Handle youtu.be short URLs
+            if (urlObj.hostname === 'youtu.be' || urlObj.hostname === 'www.youtu.be') {
+                const videoId = urlObj.pathname.replace('/', '').split('?')[0].split('&')[0];
+                if (videoId) {
+                    cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                    console.log(`[${jobId}] Cleaned youtu.be URL: ${cleanUrl}`);
+                }
+            } 
+            // Handle youtube.com/watch URLs
+            else if (urlObj.hostname.includes('youtube.com')) {
+                const videoId = urlObj.searchParams.get('v');
+                if (videoId) {
+                    cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                    console.log(`[${jobId}] Cleaned URL: ${cleanUrl}`);
+                }
             }
         } catch (urlError) {
             // If URL parsing fails, use original URL
@@ -271,17 +282,8 @@ app.post('/api/clip', async (req, res) => {
 
         console.log(`[${jobId}] Clipping from ${startSec} to ${endSec} (${clipDuration}s)`);
 
-        // Clean URL for download too
-        let downloadUrl = url;
-        try {
-            const urlObj = new URL(url);
-            const videoId = urlObj.searchParams.get('v');
-            if (videoId) {
-                downloadUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            }
-        } catch (urlError) {
-            // Use original URL if parsing fails
-        }
+        // Clean URL for download too (use the same cleaned URL from above)
+        let downloadUrl = cleanUrl;
         
         const downloadArgs = [
             '--download-sections', `*${startSec}-${endSec}`,
