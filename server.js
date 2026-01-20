@@ -218,7 +218,8 @@ app.post('/api/clip', async (req, res) => {
         
         // We use --dump-json to get video info, --no-warnings to reduce noise
         // Note: --quiet suppresses JSON output, so we don't use it here
-        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate'];
+        // Remove --no-check-certificate as it might cause issues, and add --extractor-args
+        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist'];
         
         // Add cookies if available
         if (fs.existsSync(COOKIES_FILE)) {
