@@ -90,22 +90,22 @@ const runYtDlp = (args) => {
         // Log for debugging
         console.log(`Running: ${command} ${processArgs.join(' ')}`);
         
-        const process = spawn(command, processArgs, {
+        const childProcess = spawn(command, processArgs, {
             cwd: __dirname,
             env: { ...process.env, PATH: process.env.PATH }
         });
         let stdout = '';
         let stderr = '';
 
-        process.stdout.on('data', (data) => {
+        childProcess.stdout.on('data', (data) => {
             stdout += data.toString();
         });
         
-        process.stderr.on('data', (data) => {
+        childProcess.stderr.on('data', (data) => {
             stderr += data.toString();
         });
 
-        process.on('error', (err) => {
+        childProcess.on('error', (err) => {
             console.error(`yt-dlp spawn error:`, err);
             if (err.code === 'ENOENT') {
                 reject(new Error('yt-dlp is not installed. Please install it with: pip install yt-dlp or download the binary'));
@@ -114,7 +114,7 @@ const runYtDlp = (args) => {
             }
         });
 
-        process.on('close', (code) => {
+        childProcess.on('close', (code) => {
             console.log(`yt-dlp exit code: ${code}, stdout length: ${stdout.length}, stderr length: ${stderr.length}`);
             
             if (code !== 0) {
