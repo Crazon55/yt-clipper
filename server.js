@@ -117,6 +117,14 @@ const runYtDlp = (args) => {
         childProcess.on('close', (code) => {
             console.log(`yt-dlp exit code: ${code}, stdout length: ${stdout.length}, stderr length: ${stderr.length}`);
             
+            // Log first part of output for debugging
+            if (stdout) {
+                console.log(`yt-dlp stdout preview: ${stdout.substring(0, 200)}`);
+            }
+            if (stderr) {
+                console.log(`yt-dlp stderr preview: ${stderr.substring(0, 200)}`);
+            }
+            
             if (code !== 0) {
                 // yt-dlp sometimes returns non-zero codes but still outputs JSON to stdout
                 // Check if we have valid output in stdout first
@@ -131,7 +139,9 @@ const runYtDlp = (args) => {
                 }
             } else {
                 if (!stdout.trim()) {
-                    reject(new Error(`yt-dlp returned empty output. stderr: ${stderr.substring(0, 200)}`));
+                    // Try to get more info - maybe yt-dlp needs updating or has an issue
+                    const errorMsg = stderr ? `yt-dlp returned empty output. stderr: ${stderr.substring(0, 500)}` : 'yt-dlp returned empty output. The binary may need updating or the video is unavailable.';
+                    reject(new Error(errorMsg));
                 } else {
                     resolve(stdout);
                 }
@@ -151,8 +161,23 @@ app.post('/api/clip', async (req, res) => {
         if (!url) return res.status(400).json({ error: "URL is required" });
 
         // 1. Fetch Metadata (Duration check)
+        // Clean URL - extract just the video ID to avoid playlist/query parameter issues
+        let cleanUrl = url;
+        try {
+            const urlObj = new URL(url);
+            // Extract video ID from v parameter
+            const videoId = urlObj.searchParams.get('v');
+            if (videoId) {
+                cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                console.log(`[${jobId}] Cleaned URL: ${cleanUrl}`);
+            }
+        } catch (urlError) {
+            // If URL parsing fails, use original URL
+            console.log(`[${jobId}] Could not parse URL, using original`);
+        }
+        
         // We use --dump-json to get video info, --no-warnings to reduce noise
-        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate', url];
+        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate', '--quiet', cleanUrl];
         let infoJson;
         try {
             infoJson = await runYtDlp(infoArgs);
@@ -208,6 +233,18 @@ app.post('/api/clip', async (req, res) => {
 
         console.log(`[${jobId}] Clipping from ${startSec} to ${endSec} (${clipDuration}s)`);
 
+        // Clean URL for download too
+        let downloadUrl = url;
+        try {
+            const urlObj = new URL(url);
+            const videoId = urlObj.searchParams.get('v');
+            if (videoId) {
+                downloadUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            }
+        } catch (urlError) {
+            // Use original URL if parsing fails
+        }
+        
         const downloadArgs = [
             '--download-sections', `*${startSec}-${endSec}`,
             '--force-keyframes-at-cuts',
@@ -215,7 +252,8 @@ app.post('/api/clip', async (req, res) => {
             '--output', tempFileTemplate,
             '--no-playlist',
             '--recode-video', 'mp4', // Ensure final output is MP4
-            url
+            '--quiet',
+            downloadUrl
         ];
 
         await runYtDlp(downloadArgs);
