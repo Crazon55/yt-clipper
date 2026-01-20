@@ -128,10 +128,10 @@ const runYtDlp = (args) => {
             
             // Log first part of output for debugging
             if (stdout) {
-                console.log(`yt-dlp stdout preview: ${stdout.substring(0, 200)}`);
+                console.log(`yt-dlp stdout preview: ${stdout.substring(0, 500)}`);
             }
             if (stderr) {
-                console.log(`yt-dlp stderr preview: ${stderr.substring(0, 200)}`);
+                console.log(`yt-dlp stderr preview: ${stderr.substring(0, 500)}`);
             }
             
             if (code !== 0) {
@@ -148,8 +148,13 @@ const runYtDlp = (args) => {
                 }
             } else {
                 if (!stdout.trim()) {
-                    // Try to get more info - maybe yt-dlp needs updating or has an issue
-                    const errorMsg = stderr ? `yt-dlp returned empty output. stderr: ${stderr.substring(0, 500)}` : 'yt-dlp returned empty output. The binary may need updating or the video is unavailable.';
+                    // Empty output with exit code 0 is suspicious - log full details
+                    console.error(`[CRITICAL] yt-dlp returned empty output despite success code. Command: ${command} ${processArgs.join(' ')}`);
+                    console.error(`Binary exists: ${fs.existsSync(command)}`);
+                    if (stderr) {
+                        console.error(`Full stderr: ${stderr}`);
+                    }
+                    const errorMsg = stderr ? `yt-dlp returned empty output. stderr: ${stderr.substring(0, 500)}` : 'yt-dlp returned empty output. The binary may be corrupted or incompatible.';
                     reject(new Error(errorMsg));
                 } else {
                     resolve(stdout);
