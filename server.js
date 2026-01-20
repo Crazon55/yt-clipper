@@ -38,9 +38,9 @@ const parseTimeToSeconds = (timeStr) => {
 };
 
 // Helper: Get yt-dlp command based on environment
-// Try system command first (most reliable), then binary, then Python
+// Try system command first (most reliable), then Python, then binary
 const getYtDlpCommand = () => {
-    // First, try system yt-dlp command (if installed via package manager)
+    // First, try system yt-dlp command (if installed via package manager or pip)
     if (process.platform !== 'win32') {
         try {
             const { execSync } = require('child_process');
@@ -48,11 +48,27 @@ const getYtDlpCommand = () => {
             console.log('Using system yt-dlp command (found in PATH)');
             return 'yt-dlp';
         } catch (err) {
-            // System command not found, continue to check binary
+            // System command not found, try Python next
         }
     }
     
-    // Check for standalone binary (for Render/Linux)
+    // Try Python module (most reliable on Render)
+    try {
+        const { execSync } = require('child_process');
+        execSync('python3 --version', { stdio: 'ignore', timeout: 1000 });
+        console.log('Using python3 -m yt_dlp');
+        return 'python3';
+    } catch (err) {
+        try {
+            execSync('python --version', { stdio: 'ignore', timeout: 1000 });
+            console.log('Using python -m yt_dlp');
+            return 'python';
+        } catch (err2) {
+            // Python not found, continue to binary
+        }
+    }
+    
+    // Check for standalone binary (for Render/Linux) - last resort
     const ytDlpPath = path.join(__dirname, 'yt-dlp');
     if (fs.existsSync(ytDlpPath)) {
         // Make sure it's executable on Unix systems
@@ -63,7 +79,7 @@ const getYtDlpCommand = () => {
                 // Ignore chmod errors
             }
         }
-        console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
+        console.log(`Using yt-dlp binary at: ${ytDlpPath} (may not work if it needs Python)`);
         return ytDlpPath;
     }
     
@@ -74,15 +90,15 @@ const getYtDlpCommand = () => {
         return ytDlpExe;
     }
     
-    // Fallback to Python module (Windows/local dev)
-    console.log('Using python -m yt_dlp');
-    return 'python';
+    // Final fallback
+    console.log('No yt-dlp found, will fail');
+    return 'yt-dlp';
 };
 
 // Helper: Get yt-dlp args (empty if using binary, ['-m', 'yt_dlp'] if using Python)
 const getYtDlpArgs = (userArgs) => {
     const command = getYtDlpCommand();
-    if (command === 'python') {
+    if (command === 'python' || command === 'python3') {
         return ['-m', 'yt_dlp', ...userArgs];
     }
     return userArgs;
