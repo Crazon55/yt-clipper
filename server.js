@@ -130,38 +130,16 @@ const runYtDlp = (args) => {
         });
 
         childProcess.on('close', (code) => {
-            console.log(`yt-dlp exit code: ${code}, stdout length: ${stdout.length}, stderr length: ${stderr.length}`);
-            
-            // Log first part of output for debugging
-            if (stdout) {
-                console.log(`yt-dlp stdout preview: ${stdout.substring(0, 500)}`);
-            }
-            if (stderr) {
-                console.log(`yt-dlp stderr preview: ${stderr.substring(0, 500)}`);
-            }
-            
             if (code !== 0) {
                 // yt-dlp sometimes returns non-zero codes but still outputs JSON to stdout
-                // Check if we have valid output in stdout first
                 if (stdout.trim() && stdout.trim().startsWith('{')) {
                     resolve(stdout);
                 } else {
-                    // Log stderr for debugging
-                    if (stderr) {
-                        console.error(`yt-dlp stderr: ${stderr.substring(0, 500)}`);
-                    }
                     reject(new Error(stderr || stdout || `yt-dlp failed with exit code ${code}`));
                 }
             } else {
                 if (!stdout.trim()) {
-                    // Empty output with exit code 0 is suspicious - log full details
-                    console.error(`[CRITICAL] yt-dlp returned empty output despite success code. Command: ${command} ${processArgs.join(' ')}`);
-                    console.error(`Binary exists: ${fs.existsSync(command)}`);
-                    if (stderr) {
-                        console.error(`Full stderr: ${stderr}`);
-                    }
-                    const errorMsg = stderr ? `yt-dlp returned empty output. stderr: ${stderr.substring(0, 500)}` : 'yt-dlp returned empty output. The binary may be corrupted or incompatible.';
-                    reject(new Error(errorMsg));
+                    reject(new Error(stderr || 'yt-dlp returned empty output'));
                 } else {
                     resolve(stdout);
                 }
