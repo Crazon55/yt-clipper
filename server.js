@@ -345,6 +345,49 @@ app.post('/api/clip', async (req, res) => {
 
 app.get('/health', (req, res) => res.send('Clipper Service Ready'));
 
+// Admin endpoint to update cookies
+app.post('/api/update-cookies', (req, res) => {
+    const { cookies } = req.body;
+    
+    if (!cookies || typeof cookies !== 'string') {
+        return res.status(400).json({ error: 'Cookies string is required' });
+    }
+    
+    try {
+        // Validate it looks like a cookie file
+        if (!cookies.includes('.youtube.com') && !cookies.includes('youtube.com')) {
+            return res.status(400).json({ error: 'Invalid cookie format. Must contain YouTube domain.' });
+        }
+        
+        // Write to cookies file
+        fs.writeFileSync(COOKIES_FILE, cookies, 'utf8');
+        console.log('Cookies file updated successfully');
+        
+        res.json({ success: true, message: 'Cookies updated successfully' });
+    } catch (error) {
+        console.error('Error updating cookies:', error);
+        res.status(500).json({ error: 'Failed to update cookies', details: error.message });
+    }
+});
+
+// Get current cookies status (without exposing actual cookies)
+app.get('/api/cookies-status', (req, res) => {
+    const exists = fs.existsSync(COOKIES_FILE);
+    if (exists) {
+        const stats = fs.statSync(COOKIES_FILE);
+        const size = stats.size;
+        const modified = stats.mtime;
+        res.json({ 
+            exists: true, 
+            size: size,
+            lastModified: modified.toISOString(),
+            hasContent: size > 0
+        });
+    } else {
+        res.json({ exists: false });
+    }
+});
+
 // Serve React app for all non-API routes in production
 if (process.env.NODE_ENV === 'production') {
     app.get('*', (req, res) => {
