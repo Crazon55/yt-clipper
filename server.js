@@ -92,7 +92,13 @@ const runYtDlp = (args) => {
 
         process.on('close', (code) => {
             if (code !== 0) {
-                reject(new Error(stderr || 'yt-dlp failed'));
+                // yt-dlp sometimes returns non-zero codes but still outputs JSON to stdout
+                // Check if we have valid output in stdout first
+                if (stdout.trim() && stdout.trim().startsWith('{')) {
+                    resolve(stdout);
+                } else {
+                    reject(new Error(stderr || stdout || 'yt-dlp failed'));
+                }
             } else {
                 resolve(stdout);
             }
@@ -111,10 +117,19 @@ app.post('/api/clip', async (req, res) => {
         if (!url) return res.status(400).json({ error: "URL is required" });
 
         // 1. Fetch Metadata (Duration check)
-        // We use --flat-playlist to avoid downloading invalid playlists, just single videos
-        const infoArgs = ['--dump-json', '--flat-playlist', '--no-warnings', url];
+        // We use --dump-json to get video info, --no-warnings to reduce noise
+        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', url];
         const infoJson = await runYtDlp(infoArgs);
-        const videoInfo = JSON.parse(infoJson);
+        
+        // Clean the JSON output (remove any leading/trailing whitespace or non-JSON content)
+        const cleanedJson = infoJson.trim();
+        let videoInfo;
+        try {
+            videoInfo = JSON.parse(cleanedJson);
+        } catch (parseError) {
+            console.error(`[${jobId}] JSON parse error. Raw output:`, cleanedJson.substring(0, 500));
+            throw new Error(`Failed to parse video info. The video may be unavailable or private.`);
+        }
 
         const videoDuration = videoInfo.duration;
         const startSec = parseTimeToSeconds(startTime) || 0;
