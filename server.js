@@ -46,11 +46,20 @@ const getYtDlpCommand = () => {
         if (process.platform !== 'win32') {
             try {
                 fs.chmodSync(ytDlpPath, '755');
+                // Test if binary works by checking version
+                try {
+                    const { execSync } = require('child_process');
+                    const version = execSync(`"${ytDlpPath}" --version`, { encoding: 'utf8', timeout: 5000 }).trim();
+                    console.log(`Using yt-dlp binary at: ${ytDlpPath} (version: ${version})`);
+                } catch (testErr) {
+                    console.log(`Using yt-dlp binary at: ${ytDlpPath} (version check failed, but binary exists)`);
+                }
             } catch (err) {
-                // Ignore chmod errors
+                console.log(`Using yt-dlp binary at: ${ytDlpPath} (chmod failed, but may still work)`);
             }
+        } else {
+            console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         }
-        console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         return ytDlpPath;
     }
     
@@ -177,7 +186,8 @@ app.post('/api/clip', async (req, res) => {
         }
         
         // We use --dump-json to get video info, --no-warnings to reduce noise
-        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate', '--quiet', cleanUrl];
+        // Note: --quiet suppresses JSON output, so we don't use it here
+        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate', cleanUrl];
         let infoJson;
         try {
             infoJson = await runYtDlp(infoArgs);
@@ -252,7 +262,7 @@ app.post('/api/clip', async (req, res) => {
             '--output', tempFileTemplate,
             '--no-playlist',
             '--recode-video', 'mp4', // Ensure final output is MP4
-            '--quiet',
+            '--progress', // Show progress instead of quiet
             downloadUrl
         ];
 
