@@ -39,25 +39,13 @@ const parseTimeToSeconds = (timeStr) => {
 };
 
 // Helper: Get yt-dlp command based on environment
-// Try system command first (most reliable), then Python, then binary
+// Prioritize Python (most reliable), then system command, then binary
 const getYtDlpCommand = () => {
-    // First, try system yt-dlp command (if installed via package manager or pip)
-    if (process.platform !== 'win32') {
-        try {
-            const { execSync } = require('child_process');
-            execSync('which yt-dlp', { stdio: 'ignore', timeout: 1000 });
-            console.log('Using system yt-dlp command (found in PATH)');
-            return 'yt-dlp';
-        } catch (err) {
-            // System command not found, try Python next
-        }
-    }
-    
-    // Try Python module (most reliable on Render)
+    // Try Python3 first (most reliable on Render)
     try {
         const { execSync } = require('child_process');
         execSync('python3 --version', { stdio: 'ignore', timeout: 1000 });
-        console.log('Using python3 -m yt_dlp');
+        console.log('Using python3 -m yt_dlp (most reliable)');
         return 'python3';
     } catch (err) {
         try {
@@ -65,14 +53,25 @@ const getYtDlpCommand = () => {
             console.log('Using python -m yt_dlp');
             return 'python';
         } catch (err2) {
-            // Python not found, continue to binary
+            // Python not found, continue
+        }
+    }
+    
+    // Try system yt-dlp command (if installed via package manager or pip)
+    if (process.platform !== 'win32') {
+        try {
+            const { execSync } = require('child_process');
+            execSync('which yt-dlp', { stdio: 'ignore', timeout: 1000 });
+            console.log('Using system yt-dlp command (found in PATH)');
+            return 'yt-dlp';
+        } catch (err) {
+            // System command not found
         }
     }
     
     // Check for standalone binary (for Render/Linux) - last resort
     const ytDlpPath = path.join(__dirname, 'yt-dlp');
     if (fs.existsSync(ytDlpPath)) {
-        // Make sure it's executable on Unix systems
         if (process.platform !== 'win32') {
             try {
                 fs.chmodSync(ytDlpPath, '755');
@@ -80,7 +79,7 @@ const getYtDlpCommand = () => {
                 // Ignore chmod errors
             }
         }
-        console.log(`Using yt-dlp binary at: ${ytDlpPath} (may not work if it needs Python)`);
+        console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         return ytDlpPath;
     }
     
@@ -216,10 +215,9 @@ app.post('/api/clip', async (req, res) => {
             console.log(`[${jobId}] Could not parse URL, using original`);
         }
         
-        // We use --dump-json to get video info, --no-warnings to reduce noise
-        // Note: --quiet suppresses JSON output, so we don't use it here
-        // Remove --no-check-certificate as it might cause issues, and add --extractor-args
-        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist'];
+        // We use --dump-json to get video info
+        // Use minimal flags to avoid format-related errors
+        const infoArgs = ['--dump-json', '--no-playlist', '--no-warnings', '--skip-download'];
         
         // Add cookies if available
         if (fs.existsSync(COOKIES_FILE)) {
