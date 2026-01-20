@@ -42,21 +42,33 @@ const getYtDlpCommand = () => {
     // Check for standalone binary first (for Render/Linux)
     const ytDlpPath = path.join(__dirname, 'yt-dlp');
     if (fs.existsSync(ytDlpPath)) {
+        // Make sure it's executable on Unix systems
+        if (process.platform !== 'win32') {
+            try {
+                fs.chmodSync(ytDlpPath, '755');
+            } catch (err) {
+                // Ignore chmod errors
+            }
+        }
+        console.log(`Using yt-dlp binary at: ${ytDlpPath}`);
         return ytDlpPath;
     }
     
     // Check for standalone binary with .exe (Windows)
     const ytDlpExe = path.join(__dirname, 'yt-dlp.exe');
     if (fs.existsSync(ytDlpExe)) {
+        console.log(`Using yt-dlp.exe at: ${ytDlpExe}`);
         return ytDlpExe;
     }
     
     // Try system yt-dlp command
     if (process.platform !== 'win32') {
+        console.log('Using system yt-dlp command');
         return 'yt-dlp';
     }
     
     // Fallback to Python module (Windows/local dev)
+    console.log('Using python -m yt_dlp');
     return 'python';
 };
 
