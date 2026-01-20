@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
+const COOKIES_FILE = path.join(__dirname, 'cookies.txt');
 const MAX_DURATION_SECONDS = 20 * 60; // 20 minutes limit
 
 // Ensure download directory exists
@@ -206,7 +207,15 @@ app.post('/api/clip', async (req, res) => {
         
         // We use --dump-json to get video info, --no-warnings to reduce noise
         // Note: --quiet suppresses JSON output, so we don't use it here
-        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate', cleanUrl];
+        const infoArgs = ['--dump-json', '--no-warnings', '--no-playlist', '--no-check-certificate'];
+        
+        // Add cookies if available
+        if (fs.existsSync(COOKIES_FILE)) {
+            infoArgs.push('--cookies', COOKIES_FILE);
+            console.log(`[${jobId}] Using cookies file for authentication`);
+        }
+        
+        infoArgs.push(cleanUrl);
         let infoJson;
         try {
             infoJson = await runYtDlp(infoArgs);
@@ -282,8 +291,14 @@ app.post('/api/clip', async (req, res) => {
             '--no-playlist',
             '--recode-video', 'mp4', // Ensure final output is MP4
             '--progress', // Show progress instead of quiet
-            downloadUrl
         ];
+        
+        // Add cookies if available
+        if (fs.existsSync(COOKIES_FILE)) {
+            downloadArgs.push('--cookies', COOKIES_FILE);
+        }
+        
+        downloadArgs.push(downloadUrl);
 
         await runYtDlp(downloadArgs);
 
